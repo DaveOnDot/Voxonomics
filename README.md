@@ -3,192 +3,136 @@
 Polkadot-first framework for cross-chain valuation. Voxonomics computes a Value Trusted Score (VTS) and Macro Alignment Index from five core metrics with DAO-governed weights—transparent, auditable, reproducible, and built for honest, comparable network-to-network analysis.
 
 
+# Voxonomics
+
 > **Polkadot‑first, open framework for fair, transparent, cross‑chain valuation.**  
-> Headline measures: **Value Trusted Score (VTS)** and **Macro Alignment Index (MAI)** — derived from **five core metrics** with DAO‑governed weights.
+> Headline measures: **Value Trusted Score (VTS)** and **Macro Alignment Index (MAI)** — derived from **five core metrics** (**PoV, OPI, DLI, PTI, RWAI**) with DAO‑governed weights.
+
+This README mirrors the **current API shape and environment** used in the latest scripts:
+- `GET /metrics/vts?para=<network>&decimals=<n>`
+- `GET /metrics` (lists core + sub‑metrics)
+- `GET /healthz`
+
+If you later refactor to `GET /vts?network=...`, update the examples accordingly.
 
 ---
 
-## 1) Purpose & Principles
+## 1) Quick Start
 
-Voxonomics exists to make network‑to‑network comparisons honest, reproducible, and civilised. We publish the method, the data sources, and the weights; we version every change; and we welcome scrutiny. In short: **clarity over mystique**.
+### Requirements
+- Python **3.11+**
+- (Optional) Node 18+ for docs; Docker if you prefer containers.
 
-**Principles**
-- **Open methodology** — all formulae, normalisations, and weights are public and versioned.
-- **On‑chain first** — prefer canonical chain data; declare any third‑party sources and caveats.
-- **DAO‑aligned** — metric weights are ratified by governance and applied via PRs that reference the proposal.
-- **Reproducible by design** — deterministic calculations with fixed precision and test vectors.
-- **Polkadot first, multi‑chain always** — begin with Polkadot; maintain parity for EVM and other L1s.
-
----
-
-## 2) Headline Measures
-
-- **Value Trusted Score (VTS):** A bounded score **[0, 1]** aggregating the five core metrics via normalised weights. Intended for like‑for‑like comparison across networks.
-- **Macro Alignment Index (MAI):** Tracks a network’s alignment with macro‑economic soundness (sound issuance, sustainability of fees, credible neutrality, resilience), as defined in the framework and updated by governance.
-
----
-
-## 3) The Five Core Metrics (canonical)
-
-Each core metric is a weighted sum of named sub‑metrics. Sub‑metric definitions, transforms, and bounds are specified in `/docs/metrics.md`. The DAO controls weights in `governance/weights.json`.
-
-1) **PoV — Proof of Value**  
-   *What it asks:* does the network demonstrably create and retain economic value for participants?  
-   *Illustrative sub‑metrics:* sustainable fee revenue, cost‑to‑secure vs utilisation, long‑term value accrual ratio, issuance discipline score, economic throughput quality.
-
-2) **OPI — On‑chain Participation Index**  
-   *What it asks:* is participation broad, active, and credibly decentralised?  
-   *Illustrative sub‑metrics:* unique active addresses (sybil‑adjusted), validator/staker dispersion (Gini/Herfindahl), governance turnout & proposer diversity, developer activity (on‑chain/verified), retention/tenure curves.
-
-3) **DLI — Decentralised Liquidity Index**  
-   *What it asks:* is liquidity deep, distributed, and resistant to capture?  
-   *Illustrative sub‑metrics:* AMM and order‑book depth at common ticks, cross‑venue concentration, stablecoin quality mix, bridge dependency risk, slippage at reference sizes, time‑weighted depth stability.
-
-4) **PTI — Protocol Transparency Index**  
-   *What it asks:* are monetary, technical, and governance processes transparent and auditable?  
-   *Illustrative sub‑metrics:* public RPC/indexing parity, open‑source coverage & licence health, audit trail & incident disclosure, on‑chain treasury transparency, parameter change latency & notice.
-
-5) **RWAI — Real‑World Asset Index**  
-   *What it asks:* how robustly are real‑world assets integrated and attested on‑chain?  
-   *Illustrative sub‑metrics:* oracle diversity & attestations, asset registry clarity, legal wrapper soundness, settlement finality to off‑chain, RWA protocol concentration risk, redemption latency/cost.
-
-> **Note:** The above sub‑metrics are examples; the canonical list lives in `/docs/metrics.md` and is governed by DAO proposal. Every sub‑metric has: *definition*, *source(s)*, *transform*, *bounds*, *missing‑data policy*, and *test vectors*.
-
----
-
-## 4) Architecture (bird’s‑eye)
-
-- **FastAPI service** — exposes `/vts`, `/metrics`, and health endpoints (OpenAPI at `/docs`).  
-- **`services/clients.py`** — typed clients for chain & indexer APIs (e.g., Polkadot RPC/OnFinality, Subscan, DefiLlama, others as approved).  
-- **`services/metrics.py`** — pure functions that compute sub‑metrics and aggregate to VTS/MAI.  
-- **`governance/weights.json`** — canonical, DAO‑approved weights (versioned; machine‑readable schema below).  
-- **Docs** — MkDocs site: architecture, metrics, governance, RFCs.
-
----
-
-## 5) Quick Start
-
-### Prerequisites
-- Python **3.11+**  
-- (Optional) Node 18+ for docs; Docker if you prefer containers
-
-### Run the API
+### Install & Run
 ```bash
-# Linux/macOS
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn vox_metrics_api:app --reload --port 8000
 # Open http://127.0.0.1:8000/docs
 ```
 
-```powershell
-# Windows (PowerShell)
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn vox_metrics_api:app --reload --port 8000
+---
+
+## 2) Configuration (.env)
+
+Copy `.env.example` to `.env` and fill values. **Never commit secrets.**
+```bash
+cp .env.example .env
 ```
 
-### Configure
-Create `.env` from the example and fill keys (never commit secrets):
+**Variables in use (current code paths):**
 ```
+# Core
 SUBSCAN_API_KEY=
+SUBSCAN_BASE=https://polkadot.api.subscan.io/api
 ONFINALITY_RPC=https://polkadot.api.onfinality.io/public
-DEFILLAMA_BASE=https://api.llama.fi
 POLKASSEMBLY_BASE=https://polkadot.polkassembly.io/api/v1
+DEFILLAMA_BASE=https://api.llama.fi
+HYDRADX_BASE=https://api.hydradx.io/graphql
+
+# EVM & fallbacks (used by latest error logs mentioning LAVA/POKT/BLAST)
 EVM_RPC_URL=
+LAVA_RPC=
+POKT_RPC=
+BLAST_RPC=
+BLAST_API_KEY=
+
+# Service behaviour
+REQUEST_TIMEOUT_SECONDS=8
+LOG_LEVEL=INFO
+CORS_ORIGINS=*
 ```
+
+Notes:
+- **SUBSCAN_API_KEY** must be valid for `scan/chain` health checks.
+- **EVM_RPC_URL** is required when computing EVM‑sourced sub‑metrics.
+- Fallbacks (**LAVA_RPC/POKT_RPC/BLAST_RPC**) are optional; the code should try them in order if present.
 
 ---
 
-## 6) API Sketch
-
-```
-GET /healthz
-GET /metrics                  # list core + sub‑metrics
-GET /vts?network=polkadot     # → { network, vts, coverage }
-```
-
-> Expand with `/metric/{name}` and `/weights` once stable.
-
----
-
-## 7) Weights File (machine‑readable)
-
-`governance/weights.json`:
-```json
-{
-  "version": 1,
-  "as_of": "DAO‑proposal‑ref",
-  "core_metrics": {
-    "PoV":  { "weight": 0.20, "subs": { "sustainable_fee_revenue": 0.30, "issuance_discipline": 0.20 } },
-    "OPI":  { "weight": 0.20, "subs": { "governance_turnout": 0.25, "validator_dispersion": 0.25 } },
-    "DLI":  { "weight": 0.20, "subs": { "amm_depth": 0.30, "venue_concentration": 0.20 } },
-    "PTI":  { "weight": 0.20, "subs": { "audit_trail": 0.25, "treasury_transparency": 0.25 } },
-    "RWAI": { "weight": 0.20, "subs": { "oracle_diversity": 0.30, "legal_wrapper_soundness": 0.20 } }
-  }
-}
-```
-
-**Rules**
-- Core weights must sum to **1.0**; sub‑weights per metric must sum to **1.0**.  
-- Changes land only via PRs that reference the approved DAO proposal (hash/URL) and include an *impact report* (before/after).
-
----
-
-## 8) Data & Provenance
-
-- **Primary**: on‑chain RPCs and first‑party indexers (Polkadot/Substrate; EVM where relevant).  
-- **Secondary**: public aggregators — clearly cited in code and docs.  
-- **Determinism**: fixed precision, explicit rounding, stable sorting, and a missing‑data policy (*drop*, *carry*, or *flag*).
-
----
-
-## 9) Testing
+## 3) API Usage (current)
 
 ```bash
-pytest -q
+# List metrics
+curl "$BASE/metrics"
+
+# Compute VTS (polkadot) with 9 decimals
+curl "$BASE/metrics/vts?para=polkadot&decimals=9"
+
+# Health
+curl "$BASE/healthz"
 ```
-- Provide deterministic test vectors for each sub‑metric and the VTS/MAI aggregators.  
-- CI must pass on every PR (lint, type check, unit tests).
+
+**Networks (`para`):** `polkadot`, `kusama`, or chain labels your code recognises. Keep labels consistent with your clients and weight files.
 
 ---
 
-## 10) Governance
+## 4) Metrics Overview (canonical 5)
 
-- Routine: lazy consensus via normal review.  
-- Significant: **RFC** in `/rfcs`, community discussion, DAO vote.  
-- Execution: maintainers merge PR updating `governance/weights.json` and publish release notes.  
-- Transparency: every metric and weight has an audit trail (who/what/why/when).
+- **PoV — Proof of Value:** sustainable value accrual, issuance discipline, throughput quality.
+- **OPI — On‑chain Participation Index:** active addresses (sybil‑adjusted), validator/staker dispersion, governance turnout, dev activity, retention.
+- **DLI — Decentralised Liquidity Index:** depth at reference sizes, venue concentration, stablecoin mix quality, bridge risk, slippage.
+- **PTI — Protocol Transparency Index:** open‑source coverage, audit trail, incident disclosure, treasury transparency, parameter change latency.
+- **RWAI — Real‑World Asset Index:** oracle diversity/attestations, asset registry clarity, legal wrapper soundness, settlement finality, redemption latency/cost.
 
----
-
-## 11) Contributing
-
-We welcome engineers, quants, and governors. Please read: `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, and `SECURITY.md`.  
-**Good first issues** are labelled and come with pointers and test stubs. Conventional Commits are encouraged.
+The definitive sub‑metrics, transforms, and bounds live in `docs/metrics.md` and are governed by DAO proposals.
 
 ---
 
-## 12) Roadmap (abridged)
+## 5) Governance & Weights
 
-- **M1** — Stable VTS/MAI schema + Polkadot baseline
-- **M2** — EVM parity + richer sub‑metrics
-- **M3** — DAO‑ratified weights live + public dashboard
-
-Full detail in `ROADMAP.md`.
+- Canonical weights in `governance/weights.json` (core weights sum to **1.0**; per‑metric sub‑weights sum to **1.0**).  
+- Changes land via PRs linking the approved DAO proposal (hash/URL) and an impact analysis.
 
 ---
 
-## 13) Licence & Marks
+## 6) Troubleshooting (based on latest logs)
 
-- Code under **MIT** (or **Apache‑2.0** if you switch the `LICENSE` file).  
-- The **Voxonomics** name and logos may be protected; see `TRADEMARKS.md` (use truthfully; do not imply endorsement).
+- **`subscan_failed` / HTTPStatusError** → Check `SUBSCAN_API_KEY`, `SUBSCAN_BASE`, and network egress. Try increasing `REQUEST_TIMEOUT_SECONDS`.
+- **`No working EVM RPC among LAVA/POKT/BLAST/EVM_RPC_URL`** → Provide at least one working endpoint (start with `EVM_RPC_URL`). Verify chainId by a simple `eth_chainId` call.
+- **CORS/browser issues** → Set `CORS_ORIGINS=*` (dev only), or list your domains.
+- **422 / validation** → Ensure `para` and `decimals` are supplied where required.
 
 ---
 
-## 14) Community
+## 7) Dev Scripts
 
-- GitHub Issues/Discussions (and your Discord/Matrix if applicable).  
-- Release notes and CHANGELOG announce material changes.  
-- Please keep contributions **punctual, informative, and clear**; it lifts all boats.
+A sample warm‑up script is provided at `scripts/warm.ps1` and pings `/metrics/vts?para=...&decimals=9` across networks with logs.
+
+---
+
+## 8) Contributing
+
+We welcome engineers, quants, and governors. Read `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `SECURITY.md`. Use Conventional Commits and keep PRs small with tests.
+
+---
+
+## 9) Licence & Brand
+
+Code under **MIT** (or **Apache‑2.0** if you opt to switch the `LICENSE`). The **Voxonomics** name/marks may be protected—see `TRADEMARKS.md`. Use truthfully; do not imply endorsement.
+
+---
+
+## 10) Punctuality & Clarity
+
+Kindly keep issues and commits **punctual, informative, and clear**; it greatly smooths collaboration.
